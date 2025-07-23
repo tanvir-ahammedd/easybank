@@ -32,7 +32,7 @@ class UserRegistrationView(TemplateView):
         # show form to the user 
         return self.render_to_response(
             self.get_context_data(
-                registrationform = registrationform
+                registrationform = registrationform,
                 addressform = addressform
             )
         )
