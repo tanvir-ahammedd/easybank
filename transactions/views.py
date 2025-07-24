@@ -1,5 +1,8 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect
+from django.views import View
 from django.utils import timezone
 from django.views.generic import ListView, CreateView
 from datetime import datetime
@@ -101,4 +104,81 @@ class DepositMoneyView(TransactionCreateMixin):
             f'{formatted_amount}$ was deposited to your account successfully'
         )
         return super().form_valid(form)
+ 
+class WithdrawMoneyView(TransactionCreateMixin):
+    form_class = WithdraForm
+    title = 'Withdraw Money'
     
+    def get_initial(self):
+        initial = {'transaction_type': WITHDRAWL}
+        return initial
+    
+    def form_valid(self, form):
+        amount = form.cleaned_data.get('amount')
+        self.request.user.account.balance -= amount
+        self.request.user.save(update_fields=['balance'])
+        
+        formatted_amount = f"{float(amount):,.2f}"
+        messages.success(
+            self.request,
+            f'{formatted_amount}$ was deposited to your account successfully'
+        )
+        return super().form_valid(form)
+
+class LoanRequestView(TransactionCreateMixin):
+    form_class = LoanRequestForm
+    title = 'Request For Loan'
+    
+    def get_initial(self):
+        initial = {'transaction_type': LOAN}
+        return initial
+    
+    def form_valid(self, form):
+        amount = form.cleaned_data.get('amount')
+        current_loan_count = Transaction.objects.filter(
+            account = self.request.user.account, transaction_type=3, loan_approve=True).count()
+        
+        if current_loan_count >= 3:
+            return HttpResponse("you have cross the limit")
+        
+        formatted_amount = f"{float(amount):,.2f}"
+        messages.success(
+            self.request,
+            f'{formatted_amount}$ was deposited to your account successfully'
+        )
+        return super().form_valid(form)
+    
+class PayLoanView(LoginRequiredMixin, View):
+    def get(self, request, loan_id):
+        loan = get_object_or_404(Transaction, id=loan_id)
+        print(loan)
+        if loan.loan_approaved:
+            user_account = loan.account
+            
+            if loan.amount < user_account.balance:
+                user_account.balance -= loan.amount
+                loan.balance_after_transaction 
+                loan.balance_after_transaction = user_account.balance
+                user_account.save()
+                loan.loan_approaved = True
+                loan.transaction_type = LOAN_PAID
+                loan.save()
+                return redirect('transaction: loan_list')
+            else:
+                messages.error(
+                    self.request,
+                    f'Loan amount is greater than available balanace'   
+                )
+        return redirect('loan_list')
+    
+class LoanListView(LoginRequiredMixin, ListView):
+    model = Transaction
+    template_name = 'tansactions/loan_request.html'
+    context_object_name = 'loans'
+    
+    def get_queryset(self):
+        user_account = self.request.user.account
+        queryset = Transaction.objects.filter(account=user_account, transaction_type=3)
+        print(queryset)
+        return queryset
+
