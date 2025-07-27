@@ -8,6 +8,7 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("Email must be set")
         email = self.normalize_email(email)
+        # This creates an unsaved user object using the linked model
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)

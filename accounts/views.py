@@ -1,58 +1,48 @@
-from django.contrib import messages
-from django.contrib.auth import get_user_model, login, logout
-from django.contrib.auth.views import LoginView
-from django.shortcuts import HttpResponseRedirect
+from django.shortcuts import render
+from django.views.generic import FormView
+from .forms import UserRegistrationForm,UserUpdateForm
+from django.contrib.auth import login, logout
 from django.urls import reverse_lazy
-from django.views.generic import TemplateView, RedirectView
-from .forms import UserRegistrationForm, UserAddressForm
+from django.contrib.auth.views import LoginView, LogoutView
+from django.views import View
+from django.shortcuts import redirect
 
-User = get_user_model()
-
-class UserRegistrationView(TemplateView):
-    model = User
+class UserRegistrationView(FormView):
+    template_name = 'accounts/user_registration.html'
     form_class = UserRegistrationForm
-    template_name = ""
-    # dispatch will preprocess data
-    def dispatch(self, request, *args, **kwargs):
-        if self.request.user.is_authenticated:
-            return HttpResponseRedirect(reverse_lazy(""))
-        return super().dispatch(request, *args, **kwargs)
+    success_url = reverse_lazy('profile')
     
-    def post(self, request, *args, **kwargs):
-        registrationform = UserRegistrationForm(self.request.POST)
-        addressform = UserAddressForm(self.request.POST)
-        if registrationform.is_valid() and addressform.is_valid():
-            user = registrationform.save()
-            address = addressform.save()
-            
-            login(self.request.user)
-            messages.success(self.request, (f"Thanks for creating account in our bank.. Your Account No is {user.account.account_no}"))
-            return HttpResponseRedirect(reverse_lazy(""))
-        
-        # show form to the user 
-        return self.render_to_response(
-            self.get_context_data(
-                registrationform = registrationform,
-                addressform = addressform
-            )
-        )
-    
-    # initially kwargs is empty
-    def get_context_data(self, **kwargs):
-        if 'registration_form' not in kwargs:
-            kwargs['registration_form'] = UserRegistrationForm
-        if 'address_form' not in kwargs:
-            kwargs['address_form'] = UserAddressForm
-            
-        return super().get_context_data(**kwargs)
+    def form_valid(self,form):
+        print(form.cleaned_data)
+        user = form.save()
+        login(self.request, user)
+        print(user)
+        return super().form_valid(form)
     
 class UserLoginView(LoginView):
-    template_name = ""
-    redirect_authenticated_user = False
+    template_name = 'accounts/user_login.html'
+    def get_success_url(self):
+        return reverse_lazy('home')
 
-class LogOutView(RedirectView):
-    pattern_name = "" # after logout which page the user will go
-    def get_redirect_url(self, *args, **kwargs):
+class UserLogoutView(LogoutView):
+    def get_success_url(self):
         if self.request.user.is_authenticated:
             logout(self.request)
-        return super().get_redirect_url(*args, **kwargs)
+        return reverse_lazy('home')
+
+
+class UserBankAccountUpdateView(View):
+    template_name = 'accounts/profile.html'
+
+    def get(self, request):
+        form = UserUpdateForm(instance=request.user)
+        return render(request, self.template_name, {'form': form})
+
+    def post(self, request):
+        form = UserUpdateForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('profile')
+        return render(request, self.template_name, {'form': form})
+    
+    
